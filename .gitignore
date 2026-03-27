@@ -1,0 +1,5 @@
+node_modules/
+commitment_*.json
+gen_proof.js
+*.bak
+package-lock.json

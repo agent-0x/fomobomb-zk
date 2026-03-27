@@ -40,7 +40,7 @@
 
 | | |
 |---|---|
-| 合约 | `0x7aaaa35c131f824ec0b10953a18a6b679fbd56c1` |
+| 合约 | `0xcc4702b224d554b3375175a4ca9f2671034979e4` |
 | 链 | Axon Mainnet (Chain ID: 8210) |
 | RPC | `https://mainnet-rpc.axonchain.ai/` |
 | 倒计时 | 100 区块（约 10 分钟） |
