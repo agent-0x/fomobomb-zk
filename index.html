@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FomoBomb ZK — 零知识证明 FOMO 博弈</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0a0b10; color: #e5e7eb; font-family: 'Inter', system-ui, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+  .card { background: #13151f; border: 1px solid #1e2030; border-radius: 16px; }
+  .glow-yellow { box-shadow: 0 0 30px rgba(234,179,8,0.15); }
+  .glow-red { box-shadow: 0 0 30px rgba(239,68,68,0.2); }
+  .glow-purple { box-shadow: 0 0 30px rgba(168,85,247,0.15); }
+  .glow-green { box-shadow: 0 0 20px rgba(34,197,94,0.1); }
+  @keyframes pulse-slow { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+  .pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+  @keyframes countdown-anim { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+  .countdown-anim { animation: countdown-anim 1s ease-in-out infinite; }
+  .bar { transition: width 0.5s ease; }
+  a { color: #60a5fa; }
+  .table-row { border-bottom: 1px solid #1a1c28; }
+  .table-row:hover { background: #1a1c2850; }
+</style>
+</head>
+<body>
+<div class="max-w-3xl mx-auto px-4 py-8">
+
+<!-- Header -->
+<div class="text-center mb-8">
+  <h1 class="text-4xl font-bold mb-2">
+    <span class="text-yellow-400">Fomo</span><span class="text-red-400">Bomb</span>
+    <span class="text-purple-400 text-2xl ml-2">ZK</span>
+  </h1>
+  <p class="text-gray-500 text-sm">零知识证明 FOMO 倒计时博弈 · 复利分红 · 公平大奖</p>
+</div>
+
+<!-- Live Status -->
+<div id="live" class="card p-6 mb-6 glow-yellow">
+  <div class="text-center text-gray-500 py-8">
+    <div class="inline-block w-5 h-5 border-2 border-gray-600 border-t-yellow-400 rounded-full animate-spin"></div>
+    <div class="mt-2 text-sm">连接中...</div>
+  </div>
+</div>
+
+<!-- How to Play -->
+<div class="card p-5 mb-6 text-sm text-gray-400">
+  <div class="font-semibold text-gray-300 mb-2">玩法</div>
+  <p class="leading-relaxed mb-3">投入 AXON 重置 10 分钟倒计时，最后投注者赢走奖池。<strong class="text-yellow-400">但这不是零和游戏</strong> — 每次有人投注，50% 按权重分红给所有前序玩家。投得越早，分红越多。分红可以复利（compound），不提取的话权重持续增长。</p>
+  <div class="grid grid-cols-4 gap-2 mb-3">
+    <div class="text-center p-2 bg-yellow-500/5 rounded-lg">
+      <div class="text-yellow-400 font-bold">25%</div>
+      <div class="text-xs text-gray-500">奖池</div>
+    </div>
+    <div class="text-center p-2 bg-green-500/5 rounded-lg">
+      <div class="text-green-400 font-bold">50%</div>
+      <div class="text-xs text-gray-500">分红</div>
+    </div>
+    <div class="text-center p-2 bg-purple-500/5 rounded-lg">
+      <div class="text-purple-400 font-bold">20%</div>
+      <div class="text-xs text-gray-500">ZK 大奖</div>
+    </div>
+    <div class="text-center p-2 bg-blue-500/5 rounded-lg">
+      <div class="text-blue-400 font-bold">5%</div>
+      <div class="text-xs text-gray-500">金库</div>
+    </div>
+  </div>
+  <p class="text-xs text-gray-500 mb-2">大奖使用 ZK Groth16 零知识证明 commit-reveal 机制，验证者不可操纵。大奖概率随池子大小增长，100 AXON 时 50%。</p>
+  <div class="flex items-center gap-3 text-xs">
+    <a href="https://github.com/agent-0x/fomobomb-zk" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 rounded-full text-purple-400 hover:bg-purple-500/20 transition">
+      ZK 工具包 →
+    </a>
+    <a href="https://github.com/agent-0x/fomobomb" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-500/10 border border-gray-500/30 rounded-full text-gray-400 hover:bg-gray-500/20 transition">
+      AI Skill →
+    </a>
+  </div>
+</div>
+
+<!-- Dividend Leaderboard -->
+<div class="card p-5 mb-6">
+  <div class="flex justify-between items-center mb-3">
+    <div class="font-semibold text-green-400">本轮分红排行</div>
+    <div id="player-count" class="text-xs text-gray-500"></div>
+  </div>
+  <div id="dividends">
+    <div class="text-center text-gray-600 text-sm py-4">等待投注...</div>
+  </div>
+</div>
+
+<!-- Round History -->
+<div class="card p-5 mb-6">
+  <div class="font-semibold text-gray-300 mb-3">历史记录</div>
+  <div id="history">
+    <div class="text-center text-gray-600 text-sm py-4">加载中...</div>
+  </div>
+</div>
+
+<!-- Contract Info -->
+<div class="text-center text-xs text-gray-600 space-y-1 mt-8">
+  <div>V3 合约: <span class="mono">0x7aaaa35c131f824ec0b10953a18a6b679fbd56c1</span></div>
+  <div>ZK Verifier: <span class="mono">0x0813</span> · Axon Chain (ID: 8210)</div>
+  <div><a href="https://github.com/agent-0x/fomobomb-zk" target="_blank">GitHub</a> · <a href="https://github.com/agent-0x/fomobomb" target="_blank">AI Skill</a></div>
+</div>
+
+</div>
+
+<script>
+const RPC = 'https://mainnet-rpc.axonchain.ai/';
+const CONTRACT = '0x7aaaa35c131f824ec0b10953a18a6b679fbd56c1';
+
+async function rpc(method, params) {
+  const r = await fetch(RPC, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({jsonrpc:'2.0', method, params, id:1})
+  });
+  return (await r.json()).result;
+}
+
+async function callContract(sel, args='') {
+  return rpc('eth_call', [{to: CONTRACT, data: '0x' + sel + args}, 'latest']);
+}
+
+function fromHex(h) { return parseInt(h, 16); }
+function short(addr) { return addr ? addr.slice(0,8) + '...' + addr.slice(-4) : '-'; }
+
+// Precomputed selectors
+const SEL_STATUS = '200d2ed2';
+const SEL_HISTORY = 'a7a38f0b';
+
+async function getStatus() {
+  const raw = (await callContract(SEL_STATUS)).slice(2);
+  const f = [];
+  for (let i = 0; i < raw.length; i += 64) f.push(raw.slice(i, i+64));
+  return {
+    roundId: fromHex(f[0]),
+    pool: fromHex(f[1]) / 1e18,
+    deadline: fromHex(f[2]),
+    blocksLeft: fromHex(f[3]),
+    lastPlayer: '0x' + f[4].slice(24),
+    lastBetAmount: fromHex(f[5]) / 1e18,
+    totalBetsCount: fromHex(f[6]),
+    active: fromHex(f[7]) === 1,
+    claimable: fromHex(f[8]) === 1,
+    jackpot: fromHex(f[9]) / 1e18,
+    globalBetCount: fromHex(f[10]),
+    totalWeight: fromHex(f[11]) / 1e18,
+  };
+}
+
+function renderLive(s) {
+  const el = document.getElementById('live');
+  if (!s.active && s.roundId === 0) {
+    el.innerHTML = '<div class="text-center py-8 text-gray-500">等待第一局开始</div>';
+    el.className = 'card p-6 mb-6';
+    return;
+  }
+
+  let countdownClass = 'text-green-400';
+  let glowClass = 'glow-yellow';
+  let barColor = 'bg-green-500';
+  const pct = Math.min(100, (100 - s.blocksLeft) / 100 * 100);
+
+  if (s.claimable) {
+    countdownClass = 'text-red-400 countdown-anim'; glowClass = 'glow-red'; barColor = 'bg-red-500';
+  } else if (s.blocksLeft <= 10) {
+    countdownClass = 'text-red-400 pulse-slow'; glowClass = 'glow-red'; barColor = 'bg-red-500';
+  } else if (s.blocksLeft <= 30) {
+    countdownClass = 'text-yellow-400'; barColor = 'bg-yellow-500';
+  }
+  const mins = (s.blocksLeft * 6 / 60).toFixed(1);
+
+  // Jackpot chance
+  const jpChance = Math.min(s.jackpot / 200 * 100, 50).toFixed(1);
+
+  el.className = `card p-6 mb-6 ${glowClass}`;
+  el.innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center">
+      <div>
+        <div class="text-4xl font-bold mono ${countdownClass}">${s.claimable ? 'BOOM!' : s.blocksLeft}</div>
+        <div class="text-xs text-gray-500 mt-1">${s.claimable ? '等待领奖' : mins + ' 分钟'}</div>
+        <div class="text-xs text-gray-600">剩余区块</div>
+      </div>
+      <div>
+        <div class="text-3xl font-bold mono text-yellow-400">${s.pool.toFixed(1)}</div>
+        <div class="text-xs text-gray-600 mt-1">奖池 AXON</div>
+      </div>
+      <div>
+        <div class="text-2xl font-bold mono text-purple-400">${s.jackpot.toFixed(2)}</div>
+        <div class="text-xs text-purple-500">中奖率 ${jpChance}%</div>
+        <div class="text-xs text-gray-600">ZK 大奖池</div>
+      </div>
+      <div>
+        <div class="text-2xl font-bold mono text-green-400">${s.totalWeight.toFixed(1)}</div>
+        <div class="text-xs text-gray-600 mt-1">总权重</div>
+        <div class="text-xs text-gray-500">${s.totalBetsCount} 次投注</div>
+      </div>
+    </div>
+    <div class="w-full bg-gray-800 rounded-full h-3 mb-4 overflow-hidden">
+      <div class="${barColor} h-3 rounded-full bar ${s.claimable ? 'w-full animate-pulse' : ''}" style="width:${s.claimable ? 100 : pct}%"></div>
+    </div>
+    <div class="flex justify-between text-sm">
+      <div class="text-gray-500">最后: <span class="mono text-blue-400">${short(s.lastPlayer)}</span> <span class="text-gray-600 ml-1">${s.lastBetAmount.toFixed(1)} AXON</span></div>
+      <div class="text-gray-500">Round <span class="mono text-white text-xl font-bold">#${s.roundId}</span></div>
+    </div>`;
+}
+
+async function renderHistory(currentRound) {
+  const el = document.getElementById('history');
+  const rounds = [];
+  const maxRound = currentRound - 1;
+
+  for (let i = maxRound; i >= 1 && rounds.length < 10; i--) {
+    try {
+      const raw = (await callContract(SEL_HISTORY, i.toString(16).padStart(64,'0'))).slice(2);
+      if (!raw || raw.length < 320) continue;
+      const f = [];
+      for (let j = 0; j < raw.length; j += 64) f.push(raw.slice(j, j+64));
+      const winner = '0x' + f[0].slice(24);
+      const prize = fromHex(f[1]) / 1e18;
+      const totalBets = fromHex(f[2]);
+      const totalVolume = fromHex(f[3]) / 1e18;
+      const endBlock = fromHex(f[4]);
+      if (prize === 0 && totalBets === 0) continue;
+      rounds.push({ id: i, winner, prize, totalBets, totalVolume, endBlock });
+    } catch(e) {}
+  }
+
+  if (rounds.length === 0) {
+    el.innerHTML = '<div class="text-center text-gray-600 text-sm py-4">暂无历史</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-gray-500 text-xs text-left">
+          <th class="pb-2">轮次</th>
+          <th class="pb-2">赢家</th>
+          <th class="pb-2 text-right">奖池</th>
+          <th class="pb-2 text-right">总投注额</th>
+          <th class="pb-2 text-right">投注数</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rounds.map(r => `
+        <tr class="table-row">
+          <td class="py-2 mono text-gray-400 font-bold">#${r.id}</td>
+          <td class="py-2 mono text-blue-400">${short(r.winner)}</td>
+          <td class="py-2 mono text-yellow-400 text-right">${r.prize.toFixed(2)}</td>
+          <td class="py-2 mono text-gray-400 text-right">${r.totalVolume.toFixed(1)}</td>
+          <td class="py-2 mono text-gray-500 text-right">${r.totalBets}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function update() {
+  try {
+    const s = await getStatus();
+    renderLive(s);
+    const histRound = s.active ? s.roundId : s.roundId + 1;
+    await renderHistory(histRound);
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+update();
+setInterval(update, 10000);
+</script>
+</body>
+</html>
