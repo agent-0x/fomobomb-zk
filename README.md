@@ -82,7 +82,7 @@ node prove.js generate
 附带: 你要投注的 AXON 数量（最少 1）
 ```
 
-### 第三步：抽大奖（可选）
+### 第三步：抽大奖（必须！不 reveal 就放弃大奖机会）
 
 ```bash
 # 用之前保存的 secret 和 nonce 生成证明
