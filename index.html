@@ -253,9 +253,9 @@ function renderRoundInfo(s) {
     return;
   }
 
-  const totalIn = s.pool / 0.25;  // 反推总投注额（pool = 25%）
+  const totalIn = s.totalWeight;  // 总投注权重（≈总投注额）
   const estDiv = totalIn * 0.50;
-  const estJp = totalIn * 0.20;
+  const estJp = s.jackpot;
 
   el.innerHTML = `
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -268,7 +268,7 @@ function renderRoundInfo(s) {
         <div class="mono text-green-400">${estDiv.toFixed(2)} AXON</div>
       </div>
       <div>
-        <div class="text-xs text-gray-500">进大奖池</div>
+        <div class="text-xs text-gray-500">大奖池</div>
         <div class="mono text-purple-400">${estJp.toFixed(2)} AXON</div>
       </div>
       <div>
